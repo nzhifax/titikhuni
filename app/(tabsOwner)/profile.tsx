@@ -7,6 +7,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   Alert,
   Image,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,9 +16,76 @@ import {
 } from "react-native";
 import i18n from "../../utils/i18n";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Button } from "../../components/common/Button";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
+
+interface DropdownPickerProps {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  options: { key: string; label: string }[];
+  selectedValue: string;
+  onSelect: (value: string) => void;
+  theme: any;
+}
+
+function DropdownPicker({
+  visible,
+  onClose,
+  title,
+  options,
+  selectedValue,
+  onSelect,
+  theme,
+}: DropdownPickerProps) {
+  return (
+    <Modal
+      transparent
+      visible={visible}
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity
+        style={styles.modalBackdrop}
+        activeOpacity={1}
+        onPress={onClose}
+      >
+        <View style={[styles.modalSheet, { backgroundColor: theme.card, borderTopColor: theme.border }]}>
+          <View style={styles.modalHeader}>
+            <View style={[styles.modalHandle, { backgroundColor: theme.textSecondary + "30" }]} />
+            <Text style={[styles.modalTitle, { color: theme.text }]}>{title}</Text>
+          </View>
+          <ScrollView style={styles.modalOptions}>
+            {options.map((item) => {
+              const isSelected = selectedValue === item.key;
+              return (
+                <TouchableOpacity
+                  key={item.key}
+                  style={[
+                    styles.modalOptionItem,
+                    { borderBottomColor: theme.border + "30" },
+                    isSelected && { backgroundColor: theme.primary + "15" }
+                  ]}
+                  onPress={() => {
+                    onSelect(item.key);
+                    onClose();
+                  }}
+                >
+                  <Text style={[styles.modalOptionText, { color: isSelected ? theme.primary : theme.text, fontWeight: isSelected ? "700" : "500" }]}>
+                    {item.label}
+                  </Text>
+                  {isSelected && (
+                    <Ionicons name="checkmark" size={20} color={theme.primary} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
 
 export default function Profile() {
   const { t } = useTranslation();
@@ -25,6 +93,10 @@ export default function Profile() {
   const { user, logout, updateUser } = useAuth();
   const router = useRouter();
   const [uploading, setUploading] = useState(false);
+
+  // States untuk dropdown picker
+  const [langPickerVisible, setLangPickerVisible] = useState(false);
+  const [themePickerVisible, setThemePickerVisible] = useState(false);
 
   // ======= GANTI BAHASA =======
   const handleLanguageChange = async (lang: string) => {
@@ -35,7 +107,6 @@ export default function Profile() {
       }
       await i18n.changeLanguage(lang);
       await AsyncStorage.setItem("@lokatani:language", lang);
-      console.log("Bahasa diubah ke:", lang);
     } catch (error) {
       console.error("Gagal mengubah bahasa:", error);
     }
@@ -49,7 +120,6 @@ export default function Profile() {
         text: t("common.confirm"),
         onPress: async () => {
           await logout();
-          router.replace("/auth/login");
         },
       },
     ]);
@@ -103,18 +173,25 @@ export default function Profile() {
 
   const handleChangePhoto = () => {
     Alert.alert(t("profile.changePhoto"), "", [
-      { text: "Camera", onPress: takePhoto },
-      { text: "Gallery", onPress: pickImage },
+      { text: "Kamera", onPress: takePhoto },
+      { text: "Galeri", onPress: pickImage },
       { text: t("common.cancel"), style: "cancel" },
     ]);
   };
 
+  const getLangLabel = (code: string) => {
+    return code === "id" ? "Bahasa Indonesia" : "English";
+  };
+
+  const getThemeLabel = (mode: string) => {
+    if (mode === "light") return "Mode Terang";
+    if (mode === "dark") return "Mode Gelap";
+    return "Ikuti Sistem";
+  };
+
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      edges={["top"]}
-    >
-      <ScrollView showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={["top"]}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.text }]}>
@@ -124,22 +201,15 @@ export default function Profile() {
 
         {/* Foto Profil */}
         <View style={styles.profileSection}>
-          <TouchableOpacity onPress={handleChangePhoto} disabled={uploading}>
-            <View
-              style={[
-                styles.avatarContainer,
-                { backgroundColor: theme.surface },
-              ]}
-            >
+          <TouchableOpacity onPress={handleChangePhoto} disabled={uploading} activeOpacity={0.85}>
+            <View style={[styles.avatarContainer, { backgroundColor: theme.surface, borderColor: theme.border, borderWidth: 1 }]}>
               {user?.photo ? (
                 <Image source={{ uri: user.photo }} style={styles.avatar} />
               ) : (
-                <Ionicons name="person" size={60} color={theme.primary} />
+                <Ionicons name="person" size={50} color={theme.primary} />
               )}
-              <View
-                style={[styles.cameraIcon, { backgroundColor: theme.primary }]}
-              >
-                <Ionicons name="camera" size={16} color="#FFFFFF" />
+              <View style={[styles.cameraIcon, { backgroundColor: theme.primary }]}>
+                <Ionicons name="camera" size={15} color="#FFFFFF" />
               </View>
             </View>
           </TouchableOpacity>
@@ -150,255 +220,303 @@ export default function Profile() {
           <Text style={[styles.email, { color: theme.textSecondary }]}>
             {user?.email || "example@email.com"}
           </Text>
-          <View
-            style={[styles.badge, { backgroundColor: theme.primary + "20" }]}
-          >
+          <View style={[styles.badge, { backgroundColor: theme.primary + "15" }]}>
             <Text style={[styles.badgeText, { color: theme.primary }]}>
-              {user?.userType === "owner"
-                ? t("auth.owner")
-                : user?.userType === "buyer"
-                ? t("auth.buyer")
-                : "User"}
+              {user?.userType === "owner" ? t("auth.owner") : user?.userType === "buyer" ? t("auth.buyer") : "User"}
             </Text>
           </View>
         </View>
 
-        {/* === PERSONAL INFORMATION === */}
+        {/* === KELOMPOK INFORMASI PRIBADI === */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>
-            {t("profile.personalInformation") || "Personal Information"}
+          <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+            {t("profile.personalInformation")}
           </Text>
-
-          <View
-            style={[styles.infoCard, { backgroundColor: theme.surface }]}
-          >
-            <View style={styles.infoItem}>
-              <Ionicons name="person-outline" size={20} color={theme.primary} />
-              <Text style={[styles.infoText, { color: theme.text }]}>
+          <View style={[styles.menuGroup, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={styles.menuItem}>
+              <View style={styles.menuItemLeft}>
+                <Ionicons name="person-outline" size={20} color={theme.primary} />
+                <Text style={[styles.menuItemText, { color: theme.text }]}>Nama Lengkap</Text>
+              </View>
+              <Text style={[styles.menuItemValue, { color: theme.textSecondary }]} numberOfLines={1}>
                 {user?.fullName || "-"}
               </Text>
             </View>
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
-            <View style={styles.infoItem}>
-              <Ionicons name="mail-outline" size={20} color={theme.primary} />
-              <Text style={[styles.infoText, { color: theme.text }]}>
+            <View style={styles.menuItem}>
+              <View style={styles.menuItemLeft}>
+                <Ionicons name="mail-outline" size={20} color={theme.primary} />
+                <Text style={[styles.menuItemText, { color: theme.text }]}>Email</Text>
+              </View>
+              <Text style={[styles.menuItemValue, { color: theme.textSecondary }]} numberOfLines={1}>
                 {user?.email || "-"}
               </Text>
             </View>
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
-            {user?.phone && (
-              <View style={styles.infoItem}>
+            <View style={styles.menuItem}>
+              <View style={styles.menuItemLeft}>
                 <Ionicons name="call-outline" size={20} color={theme.primary} />
-                <Text style={[styles.infoText, { color: theme.text }]}>
-                  {user.phone}
-                </Text>
+                <Text style={[styles.menuItemText, { color: theme.text }]}>No. Telepon</Text>
               </View>
-            )}
-
-            {user?.address && (
-              <View style={styles.infoItem}>
-                <Ionicons
-                  name="location-outline"
-                  size={20}
-                  color={theme.primary}
-                />
-                <Text
-                  style={[styles.infoText, { color: theme.text }]}
-                  numberOfLines={2}
-                >
-                  {user.address}
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Tombol Edit Profil */}
-        <View style={styles.section}>
-          <Button
-            title={t("profile.editProfile")}
-            onPress={() => router.push("/editprofile")}
-          />
-        </View>
-
-        {/* Bahasa */}
-        <View style={styles.section}>
-          <View
-            style={[styles.settingItem, { backgroundColor: theme.surface }]}
-          >
-            <View style={styles.settingLeft}>
-              <Ionicons
-                name="language-outline"
-                size={24}
-                color={theme.primary}
-              />
-              <Text style={[styles.settingText, { color: theme.text }]}>
-                {t("profile.language")}
+              <Text style={[styles.menuItemValue, { color: theme.textSecondary }]}>
+                {user?.phone || "-"}
               </Text>
             </View>
-            <View style={styles.languageButtons}>
-              {["id", "en"].map((lang) => (
-                <TouchableOpacity
-                  key={lang}
-                  style={[
-                    styles.langButton,
-                    {
-                      backgroundColor:
-                        i18n.language === lang
-                          ? theme.primary
-                          : theme.background,
-                    },
-                  ]}
-                  onPress={() => handleLanguageChange(lang)}
-                >
-                  <Text
-                    style={[
-                      styles.langText,
-                      { color: i18n.language === lang ? "#FFF" : theme.text },
-                    ]}
-                  >
-                    {lang.toUpperCase()}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
-        {/* Tema */}
-        <View style={styles.section}>
-          <View
-            style={[styles.settingItem, { backgroundColor: theme.surface }]}
-          >
-            <View style={styles.settingLeft}>
-              <Ionicons
-                name="color-palette-outline"
-                size={24}
-                color={theme.primary}
-              />
-              <Text style={[styles.settingText, { color: theme.text }]}>
-                {t("profile.theme")}
+            <View style={styles.menuItem}>
+              <View style={styles.menuItemLeft}>
+                <Ionicons name="location-outline" size={20} color={theme.primary} />
+                <Text style={[styles.menuItemText, { color: theme.text }]}>Alamat</Text>
+              </View>
+              <Text style={[styles.menuItemValue, { color: theme.textSecondary }]} numberOfLines={1}>
+                {user?.address || "-"}
               </Text>
             </View>
-            <View style={styles.themeButtons}>
-              <TouchableOpacity
-                style={[
-                  styles.themeButton,
-                  {
-                    backgroundColor:
-                      themeMode === "light"
-                        ? theme.primary
-                        : theme.background,
-                  },
-                ]}
-                onPress={() => toggleTheme("light")}
-              >
-                <Ionicons
-                  name="sunny"
-                  size={18}
-                  color={themeMode === "light" ? "#FFF" : theme.textSecondary}
-                />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.themeButton,
-                  {
-                    backgroundColor:
-                      themeMode === "dark"
-                        ? theme.primary
-                        : theme.background,
-                  },
-                ]}
-                onPress={() => toggleTheme("dark")}
-              >
-                <Ionicons
-                  name="moon"
-                  size={18}
-                  color={themeMode === "dark" ? "#FFF" : theme.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
 
-        {/* Logout */}
-        <View style={styles.logoutContainer}>
-          <Button
-            title={t("auth.logout")}
-            onPress={handleLogout}
-            variant="outline"
-          />
+        {/* === KELOMPOK PENGATURAN APLIKASI === */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
+            {t("profile.settings") || "PENGATURAN"}
+          </Text>
+          <View style={[styles.menuGroup, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            {/* Edit Profil */}
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push("/editprofile")} activeOpacity={0.7}>
+              <View style={styles.menuItemLeft}>
+                <Ionicons name="create-outline" size={20} color={theme.primary} />
+                <Text style={[styles.menuItemText, { color: theme.text }]}>{t("profile.editProfile")}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={theme.textLight} />
+            </TouchableOpacity>
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+            {/* Pilihan Bahasa */}
+            <TouchableOpacity style={styles.menuItem} onPress={() => setLangPickerVisible(true)} activeOpacity={0.7}>
+              <View style={styles.menuItemLeft}>
+                <Ionicons name="language-outline" size={20} color={theme.primary} />
+                <Text style={[styles.menuItemText, { color: theme.text }]}>{t("profile.language")}</Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <Text style={{ color: theme.textSecondary, fontSize: 14 }}>{getLangLabel(i18n.language)}</Text>
+                <Ionicons name="chevron-forward" size={18} color={theme.textLight} />
+              </View>
+            </TouchableOpacity>
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+            {/* Pilihan Tema */}
+            <TouchableOpacity style={styles.menuItem} onPress={() => setThemePickerVisible(true)} activeOpacity={0.7}>
+              <View style={styles.menuItemLeft}>
+                <Ionicons name="color-palette-outline" size={20} color={theme.primary} />
+                <Text style={[styles.menuItemText, { color: theme.text }]}>{t("profile.theme")}</Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <Text style={{ color: theme.textSecondary, fontSize: 14 }}>{getThemeLabel(themeMode)}</Text>
+                <Ionicons name="chevron-forward" size={18} color={theme.textLight} />
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
+
+        {/* === KELOMPOK AKSI === */}
+        <View style={[styles.section, { marginBottom: 40 }]}>
+          <View style={[styles.menuGroup, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <TouchableOpacity style={styles.menuItem} onPress={handleLogout} activeOpacity={0.7}>
+              <View style={styles.menuItemLeft}>
+                <Ionicons name="log-out-outline" size={20} color={theme.error} />
+                <Text style={[styles.menuItemText, { color: theme.error, fontWeight: "700" }]}>{t("auth.logout")}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={theme.error + "80"} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Dropdowns */}
+        <DropdownPicker
+          visible={langPickerVisible}
+          onClose={() => setLangPickerVisible(false)}
+          title="Pilih Bahasa"
+          options={[
+            { key: "id", label: "Bahasa Indonesia" },
+            { key: "en", label: "English" },
+          ]}
+          selectedValue={i18n.language}
+          onSelect={handleLanguageChange}
+          theme={theme}
+        />
+
+        <DropdownPicker
+          visible={themePickerVisible}
+          onClose={() => setThemePickerVisible(false)}
+          title="Pilih Tema"
+          options={[
+            { key: "light", label: "Mode Terang" },
+            { key: "dark", label: "Mode Gelap" },
+            { key: "system", label: "Ikuti Sistem" },
+          ]}
+          selectedValue={themeMode}
+          onSelect={(mode) => toggleTheme(mode as any)}
+          theme={theme}
+        />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { paddingHorizontal: 20, paddingVertical: 16 },
-  title: { fontSize: 28, fontWeight: "bold" },
-  profileSection: { alignItems: "center", paddingVertical: 24 },
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 24,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
+    alignItems: "center",
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "700",
+  },
+  profileSection: {
+    alignItems: "center",
+    paddingVertical: 16,
+  },
   avatarContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 12,
     position: "relative",
   },
-  avatar: { width: 120, height: 120, borderRadius: 60 },
+  avatar: {
+    width: 98,
+    height: 98,
+    borderRadius: 49,
+  },
   cameraIcon: {
     position: "absolute",
     bottom: 0,
     right: 0,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
   },
-  name: { fontSize: 24, fontWeight: "bold", marginBottom: 4 },
-  email: { fontSize: 16, marginBottom: 8 },
-  badge: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 16 },
-  badgeText: { fontSize: 14, fontWeight: "600" },
-  section: { paddingHorizontal: 20, marginTop: 8 },
-  sectionTitle: { fontSize: 18, fontWeight: "700", marginBottom: 12 },
-  infoCard: {
-    padding: 16,
+  name: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  email: {
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  badge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     borderRadius: 12,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  section: {
+    paddingHorizontal: 16,
+    marginTop: 16,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  menuGroup: {
+    borderRadius: 16,
+    borderWidth: 0.5,
+    overflow: "hidden",
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    minHeight: 52,
+  },
+  menuItemLeft: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
-  infoItem: { flexDirection: "row", alignItems: "center", gap: 10 },
-  infoText: { fontSize: 15 },
-  settingItem: {
+  menuItemText: {
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  menuItemValue: {
+    fontSize: 14,
+    maxWidth: "55%",
+  },
+  divider: {
+    height: 0.5,
+    marginLeft: 48,
+  },
+  // Modal Bottom Sheet Picker Styles
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    justifyContent: "flex-end",
+  },
+  modalSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    borderTopWidth: 1,
+    paddingBottom: 40,
+    maxHeight: "50%",
+  },
+  modalHeader: {
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "rgba(0, 0, 0, 0.05)",
+  },
+  modalHandle: {
+    width: 36,
+    height: 5,
+    borderRadius: 2.5,
+    marginBottom: 8,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  modalOptions: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  modalOptionItem: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  settingLeft: { flexDirection: "row", alignItems: "center" },
-  settingText: { fontSize: 16, marginLeft: 12 },
-  languageButtons: { flexDirection: "row", gap: 8 },
-  langButton: {
-    width: 50,
-    height: 36,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderBottomWidth: 0.5,
     borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
+    marginVertical: 2,
   },
-  langText: { fontSize: 14, fontWeight: "600" },
-  themeButtons: { flexDirection: "row", gap: 8 },
-  themeButton: {
-    width: 44,
-    height: 36,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
+  modalOptionText: {
+    fontSize: 15,
   },
-  logoutContainer: { paddingHorizontal: 20, paddingVertical: 32 },
 });

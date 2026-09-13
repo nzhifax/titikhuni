@@ -12,19 +12,21 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useBookmark } from "../../contexts/BookmarkContext";
 import { useRouter } from "expo-router";
+import { useTheme } from "../../contexts/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
 export default function FavoritesScreen() {
   const { favorites, toggleFavorite } = useBookmark();
   const router = useRouter();
+  const { theme, isDark } = useTheme();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F9FAFB" }}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       {/* HEADER */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Favorit Saya</Text>
-        <Text style={styles.subtitle}>
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+        <Text style={[styles.title, { color: theme.text }]}>Favorit Saya</Text>
+        <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
           {favorites.length > 0
             ? `${favorites.length} properti disimpan`
             : "Tidak ada properti favorit"}
@@ -34,9 +36,9 @@ export default function FavoritesScreen() {
       {/* EMPTY STATE */}
       {favorites.length === 0 ? (
         <View style={styles.empty}>
-          <Ionicons name="heart-dislike-outline" size={70} color="#D1D5DB" />
-          <Text style={styles.emptyText}>Belum ada properti yang kamu simpan</Text>
-          <Text style={styles.emptySub}>
+          <Ionicons name="heart-dislike-outline" size={70} color={theme.textSecondary} />
+          <Text style={[styles.emptyText, { color: theme.text }]}>Belum ada properti yang kamu simpan</Text>
+          <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
             Simpan lahan atau rumah favoritmu untuk dilihat nanti 🌿
           </Text>
         </View>
@@ -48,33 +50,47 @@ export default function FavoritesScreen() {
           {favorites.map((item) => (
             <TouchableOpacity
               key={item.id}
-              style={styles.card}
+              style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}
               activeOpacity={0.9}
               onPress={() =>
                 router.push({
-                  pathname: `/product/${item.id}`,
-                  params: { item: JSON.stringify(item) },
+                  pathname: "/product/[id]",
+                  params: { id: item.id },
                 })
               }
             >
-              <Image source={{ uri: item.image }} style={styles.image} />
-              <View style={styles.info}>
-                <Text style={styles.name}>{item.name}</Text>
-                <View style={styles.locRow}>
-                  <Ionicons name="location-outline" size={14} color="#6B7280" />
-                  <Text style={styles.location}>{item.location}</Text>
+              {item.image ? (
+                <Image source={{ uri: item.image }} style={styles.image} />
+              ) : (
+                <View style={[styles.image, { backgroundColor: theme.surface, alignItems: "center", justifyContent: "center" }]}>
+                  <Ionicons name="image-outline" size={32} color={theme.textSecondary} />
                 </View>
-                <Text style={styles.price}>
+              )}
+              
+              <View style={styles.info}>
+                <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <View style={styles.locRow}>
+                  <Ionicons name="location-outline" size={14} color={theme.textSecondary} />
+                  <Text style={[styles.location, { color: theme.textSecondary }]} numberOfLines={1}>
+                    {item.location}
+                  </Text>
+                </View>
+                <Text style={[styles.price, { color: theme.primary }]}>
                   Rp{item.price?.toLocaleString("id-ID")}{" "}
-                  <Text style={styles.unit}>
-                    {item.isForSale ? "/ha" : "/tahun"}
+                  <Text style={[styles.unit, { color: theme.textSecondary }]}>
+                    {(item.forSale ?? (item as any).isForSale) ? "/ha" : "/tahun"}
                   </Text>
                 </Text>
               </View>
 
               {/* ❤️ Unfavorite Button */}
               <TouchableOpacity
-                style={styles.favoriteBtn}
+                style={[styles.favoriteBtn, { 
+                  backgroundColor: isDark ? "#3A1E1E" : "#FEE2E2", 
+                  borderLeftColor: isDark ? "#5C2E2E" : "#FCA5A5" 
+                }]}
                 onPress={() => toggleFavorite(item)}
               >
                 <Ionicons name="heart-dislike" size={22} color="#EF4444" />
@@ -89,21 +105,20 @@ export default function FavoritesScreen() {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   header: {
     paddingHorizontal: 20,
     paddingVertical: 12,
-    backgroundColor: "#FFF",
     borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
   },
   title: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#111827",
   },
   subtitle: {
     fontSize: 13,
-    color: "#6B7280",
     marginTop: 2,
   },
   empty: {
@@ -117,17 +132,14 @@ const styles = StyleSheet.create({
     marginTop: 14,
     fontSize: 16,
     fontWeight: "600",
-    color: "#374151",
   },
   emptySub: {
-    color: "#6B7280",
     textAlign: "center",
     marginTop: 6,
     fontSize: 13,
   },
   card: {
     flexDirection: "row",
-    backgroundColor: "#FFF",
     borderRadius: 14,
     marginHorizontal: 16,
     marginTop: 12,
@@ -137,6 +149,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 2 },
     overflow: "hidden",
+    borderWidth: 0.5,
   },
   image: {
     width: width * 0.3,
@@ -150,7 +163,6 @@ const styles = StyleSheet.create({
   name: {
     fontWeight: "700",
     fontSize: 15,
-    color: "#111827",
     marginBottom: 2,
   },
   locRow: {
@@ -160,25 +172,21 @@ const styles = StyleSheet.create({
   },
   location: {
     fontSize: 12,
-    color: "#6B7280",
     marginLeft: 4,
+    flex: 1,
   },
   price: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#059669",
   },
   unit: {
     fontSize: 12,
-    color: "#6B7280",
   },
   favoriteBtn: {
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 10,
-    backgroundColor: "#FEE2E2",
     borderLeftWidth: 1,
-    borderLeftColor: "#FCA5A5",
   },
   unfavText: {
     fontSize: 10,

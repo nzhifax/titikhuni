@@ -41,7 +41,13 @@ export const Input: React.FC<InputProps> = ({
           {
             backgroundColor: theme.inputBackground || theme.surfaceLight,
             borderColor: error ? theme.error : theme.border,
-            shadowColor: theme.shadow,
+            borderWidth: theme.borderWidth,
+            borderRadius: theme.borderRadius,
+            shadowColor: theme.shadow || '#000',
+            shadowOffset: theme.shadowOffset,
+            shadowOpacity: theme.shadowOpacity,
+            shadowRadius: theme.shadowRadius,
+            elevation: 1,
           },
         ]}
       >
@@ -98,14 +104,8 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 12,
-    borderWidth: 1.2,
     paddingHorizontal: 12,
     minHeight: 50,
-    backgroundColor: "#F9FAFB",
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 2 },
   },
   icon: {
     marginRight: 8,

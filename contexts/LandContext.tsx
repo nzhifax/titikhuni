@@ -1,114 +1,189 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import api from "@/services/apiClient";
 
+// ==============================
+// 🧩 Interface Definitions  (UNCHANGED — UI components remain the same)
+// ==============================
 export interface Land {
   id: string;
   name: string;
   location: string;
   coords?: { latitude: number; longitude: number }[];
   center?: { latitude: number; longitude: number };
-  images?: string[]; // multiple images
-  soilType?: string;
-  temperature?: string;
-  area?: { land: string; building?: string }; // misal "500 m²", "200 m²"
+  image?: string;
+  images?: string[];
+  area?: { land?: string; building?: string };
   price?: number;
-  status?: "available" | "sold" | "rented";
-  crop?: string;
+  status?: "Pending" | "Approved" | "Rejected" | "Sold" | "Archived";
   owner?: string;
+  ownerId?: string;
   isOnline?: boolean;
-  fertilizer?: { date: string; type: string; weight: string }[];
   isForSale?: boolean;
   rating?: number;
-  type?: "house" | "apartment" | "shop" | "land";
+  type?: "house" | "apartment";
   facilities?: string[];
   description?: string;
+  floors?: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  electricity?: number;
+  certificate?: string;
+  garage?: string;
+  unitFloor?: number;
+  unitType?: string;
+  furnished?: "furnished" | "semi" | "unfurnished";
+  views?: number;
+  favorites?: number;
+  inquiriesCount?: number;
+  certificateImage?: string;
+  createdAt?: string;
+  rejectionReason?: string;
+  // Spatial
+  distanceKm?: number;
+}
+
+export interface NotificationItem {
+  id: string;
+  propertyId: string;
+  propertyName: string;
+  type: "submitted" | "approved" | "rejected" | "archived" | "sold";
+  ownerName: string;
+  reason?: string;
+  timestamp: number;
+  read: boolean;
 }
 
 interface LandContextType {
   lands: Land[];
   setLands: React.Dispatch<React.SetStateAction<Land[]>>;
+  notifications: NotificationItem[];
+  setNotifications: React.Dispatch<React.SetStateAction<NotificationItem[]>>;
+  addNotification: (
+    propertyId: string,
+    propertyName: string,
+    type: "submitted" | "approved" | "rejected" | "archived" | "sold",
+    ownerName: string,
+    reason?: string
+  ) => void;
+  incrementViews: (id: string) => void;
+  incrementFavorites: (id: string) => void;
+  incrementInquiries: (id: string) => void;
+  refreshLands: () => Promise<void>;
+  isLoading: boolean;
 }
 
 const LandContext = createContext<LandContextType | undefined>(undefined);
 
+// Map API response to frontend Land interface
+const mapApiLand = (d: any): Land => ({
+  id:              String(d.id),
+  name:            d.name,
+  location:        d.location,
+  price:           d.price,
+  isForSale:       d.isForSale ?? true,
+  type:            d.type,
+  status:          d.status,
+  owner:           d.owner,
+  ownerId:         d.ownerId,
+  description:     d.description,
+  image:           d.image,
+  images:          d.images,
+  area:            d.area,
+  floors:          d.floors,
+  bedrooms:        d.bedrooms,
+  bathrooms:       d.bathrooms,
+  electricity:     d.electricity,
+  certificate:     d.certificate,
+  certificateImage:d.certificateImage,
+  garage:          d.garage,
+  unitFloor:       d.unitFloor,
+  unitType:        d.unitType,
+  furnished:       d.furnished,
+  facilities:      d.facilities || [],
+  views:           d.views ?? 0,
+  favorites:       d.favorites ?? 0,
+  inquiriesCount:  d.inquiriesCount ?? 0,
+  center:          d.center,
+  distanceKm:      d.distanceKm,
+  rejectionReason: d.rejectionReason,
+  createdAt:       d.createdAt,
+});
+
 export const LandProvider = ({ children }: { children: ReactNode }) => {
-  const [lands, setLands] = useState<Land[]>([
-    {
-      id: "1",
-      name: "Rumah Mewah Sleman",
-      location: "Sleman, Yogyakarta",
-      price: 1200000000,
-      area: { land: "350 m²", building: "200 m²" },
-      status: "available",
-      type: "house",
-      rating: 4.8,
-      owner: "Budi Santoso",
-      isForSale: true,
-      facilities: ["3 Bedrooms", "2 Bathrooms", "Garage", "Swimming Pool"],
-      description: "Rumah mewah dengan fasilitas lengkap, dekat pusat kota dan sekolah.",
-      image: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800",
-      images: [
-        "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800",
-        "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=800",
-      ],
-    },
-    {
-      id: "2",
-      name: "Apartemen Kalasan",
-      location: "Kalasan, Sleman",
-      price: 850000000,
-      area: { land: "n/a", building: "90 m²" },
-      status: "available",
-      type: "apartment",
-      rating: 4.6,
-      owner: "Siti Aminah",
-      isForSale: true,
-      facilities: ["2 Bedrooms", "1 Bathroom", "Balcony", "Gym Access"],
-      description: "Apartemen modern dengan akses mudah ke pusat kota dan kampus.",
-      image: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800",
-      images: [
-        "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=800",
-      ],
-    },
-    {
-      id: "3",
-      name: "Ruko Strategis Jogja",
-      location: "Umbulharjo, Yogyakarta",
-      price: 1500000000,
-      area: { land: "150 m²", building: "120 m²" },
-      status: "available",
-      type: "shop",
-      rating: 4.7,
-      owner: "Agus Santoso",
-      isForSale: true,
-      facilities: ["2 Lantai", "1 Garage", "Parkir Luas"],
-      description: "Ruko strategis di pusat kota, cocok untuk usaha atau kantor.",
-      image: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800",
-      images: [
-        "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800",
-      ],
-    },
-    {
-      id: "4",
-      name: "Tanah Kavling Bantul",
-      location: "Bantul, Yogyakarta",
-      price: 50000000,
-      area: { land: "100 m²" },
-      status: "available",
-      type: "land",
-      rating: 4.4,
-      owner: "Rina Wulandari",
-      isForSale: true,
-      facilities: ["Dekat Jalan Raya", "Akses Air & Listrik"],
-      description: "Tanah kavling siap bangun, cocok untuk rumah atau investasi.",
-      image: "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800",
-      images: [
-        "https://images.unsplash.com/photo-1528909514045-2fa4ac7a08ba?w=800",
-      ],
-    },
-  ]);
+  const [lands, setLands] = useState<Land[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch lands from backend
+  const refreshLands = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const res = await api.get("/lands");
+      setLands((res.data as any[]).map(mapApiLand));
+    } catch (error) {
+      console.error("❌ Error fetching lands:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    refreshLands();
+  }, [refreshLands]);
+
+  // addNotification — fires when Admin changes land status
+  // (Notification creation is also done server-side in PATCH /api/lands/:id/status)
+  const addNotification = (
+    propertyId: string,
+    propertyName: string,
+    type: "submitted" | "approved" | "rejected" | "archived" | "sold",
+    ownerName: string,
+    reason?: string
+  ) => {
+    const newNotif: NotificationItem = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      propertyId,
+      propertyName,
+      type,
+      ownerName,
+      reason,
+      timestamp: Date.now(),
+      read: false,
+    };
+    setNotifications((prev) => [newNotif, ...prev]);
+  };
+
+  // Analytics helpers — call backend to persist the count
+  const incrementViews = async (id: string) => {
+    setLands((prev) =>
+      prev.map((l) => (l.id === id ? { ...l, views: (l.views || 0) + 1 } : l))
+    );
+    try { await api.put(`/lands/${id}/analytics`, { field: "views" }); } catch {}
+  };
+
+  const incrementFavorites = async (id: string) => {
+    setLands((prev) =>
+      prev.map((l) => (l.id === id ? { ...l, favorites: (l.favorites || 0) + 1 } : l))
+    );
+    try { await api.put(`/lands/${id}/analytics`, { field: "favorites" }); } catch {}
+  };
+
+  const incrementInquiries = async (id: string) => {
+    setLands((prev) =>
+      prev.map((l) => (l.id === id ? { ...l, inquiriesCount: (l.inquiriesCount || 0) + 1 } : l))
+    );
+    try { await api.put(`/lands/${id}/analytics`, { field: "inquiries_count" }); } catch {}
+  };
 
   return (
-    <LandContext.Provider value={{ lands, setLands }}>
+    <LandContext.Provider value={{
+      lands, setLands,
+      notifications, setNotifications,
+      addNotification,
+      incrementViews, incrementFavorites, incrementInquiries,
+      refreshLands, isLoading,
+    }}>
       {children}
     </LandContext.Provider>
   );
@@ -116,8 +191,6 @@ export const LandProvider = ({ children }: { children: ReactNode }) => {
 
 export const useLands = (): LandContextType => {
   const context = useContext(LandContext);
-  if (!context) {
-    throw new Error("useLands must be used within a LandProvider");
-  }
+  if (!context) throw new Error("useLands must be used within a LandProvider");
   return context;
 };

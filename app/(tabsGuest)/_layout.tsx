@@ -5,11 +5,13 @@ import { useTheme } from "../../contexts/ThemeContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useRouter } from "expo-router";
 import { TouchableOpacity } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function GuestLayout() {
   const { theme } = useTheme();
   const { user } = useAuth();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -21,9 +23,9 @@ export default function GuestLayout() {
           backgroundColor: theme.surface,
           borderTopWidth: 0.5,
           borderTopColor: "#E5E7EB",
-          height: 60,
-          paddingBottom: 6,
-          paddingTop: 6,
+          height: insets.bottom > 0 ? 84 : 64,
+          paddingBottom: insets.bottom > 0 ? insets.bottom - 6 : 8,
+          paddingTop: 8,
         },
         tabBarLabelStyle: {
           fontSize: 12,

@@ -1,12 +1,12 @@
 export const lightTheme = {
-  // Primary brand color (professional blue)
-  primary: "#1E88E5",
-  primaryDark: "#1565C0",
-  primaryLight: "#64B5F6",
+  // Primary brand color (matching map & property detail green)
+  primary: "#2E7D32",
+  primaryDark: "#1B5E20",
+  primaryLight: "#16A34A",
 
   // Base background colors
   background: "#FFFFFF",
-  surface: "#F5F7FA",
+  surface: "#F8FAFC",
   surfaceLight: "#FAFBFC",
   card: "#FFFFFF",
 
@@ -16,24 +16,31 @@ export const lightTheme = {
   textLight: "#9CA3AF",
 
   // Borders & visual separators
-  border: "#E5E7EB",
+  border: "#E2E8F0",
 
   // Semantic colors
   error: "#E53935",
   success: "#2E7D32",
   warning: "#F9A825",
-  info: "#1E88E5",
+  info: "#2E7D32",
 
   // UI components
-  inputBackground: "#EEF2F5",
-  shadow: "rgba(0, 0, 0, 0.08)",
+  inputBackground: "#F1F5F9",
+  shadow: "rgba(15, 23, 42, 0.08)",
+
+  // Premium Modern clean styles
+  borderRadius: 12,
+  borderWidth: 1,
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.8, // React Native shadow opacity works relative to the shadowColor's alpha
+  shadowRadius: 10,
 };
 
 export const darkTheme = {
-  // Primary brand color (still blue, but lighter for dark background)
-  primary: "#64B5F6",
-  primaryDark: "#2196F3",
-  primaryLight: "#90CAF9",
+  // Primary brand color (matching map & property detail green)
+  primary: "#2E7D32",
+  primaryDark: "#1B5E20",
+  primaryLight: "#4CAF50",
 
   // Background layers
   background: "#0A1929",
@@ -51,11 +58,19 @@ export const darkTheme = {
   error: "#EF5350",
   success: "#81C784",
   warning: "#FBC02D",
-  info: "#64B5F6",
+  info: "#2E7D32",
 
   // UI
   inputBackground: "#1A273D",
-  shadow: "rgba(0, 0, 0, 0.4)",
+  shadow: "rgba(0, 0, 0, 0.3)",
+
+  // Premium Modern clean styles
+  borderRadius: 12,
+  borderWidth: 1,
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.8,
+  shadowRadius: 10,
 };
 
 export type Theme = typeof lightTheme;
+

@@ -4,15 +4,15 @@ import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "../../contexts/ThemeContext";
-
-import { ProductProvider } from "../../contexts/ProductContext";
 import { BookmarkProvider, useBookmark } from "../../contexts/BookmarkContext";
 import { LandProvider } from "../../contexts/LandContext"; // ✅ Tambahkan ini agar data lahan global tersedia
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 function BuyerTabs() {
   const { t } = useTranslation();
   const { theme } = useTheme();
   const { favorites } = useBookmark();
+  const insets = useSafeAreaInsets();
 
   const favoriteCount = favorites.length;
 
@@ -26,9 +26,9 @@ function BuyerTabs() {
           backgroundColor: theme.surface,
           borderTopColor: theme.border,
           borderTopWidth: 1,
-          paddingBottom: 8,
+          height: insets.bottom > 0 ? 84 : 64,
+          paddingBottom: insets.bottom > 0 ? insets.bottom - 6 : 8,
           paddingTop: 8,
-          height: 60,
         },
         tabBarLabelStyle: {
           fontSize: 12,
@@ -97,11 +97,9 @@ function BuyerTabs() {
 export default function PembeliLayout() {
   return (
     <BookmarkProvider>
-      <ProductProvider>
         <LandProvider> {/* ✅ Bungkus agar data tanah tersedia di semua tab */}
           <BuyerTabs />
         </LandProvider>
-      </ProductProvider>
     </BookmarkProvider>
   );
 }

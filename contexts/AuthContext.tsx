@@ -1,12 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { router } from 'expo-router'; 
+import api from '@/services/apiClient';
 
-const USER_KEY = '@lokatani:user';
-const USERS_KEY = '@lokatani:users';
+const TOKEN_KEY  = '@lokatani_token';
+const USER_KEY   = '@lokatani:user';
 
 // ==============================
-// 🧩 Interface Definitions
+// 🧩 Interface Definitions  (UNCHANGED — UI components remain the same)
 // ==============================
 export interface LocationData {
   latitude: number;
@@ -18,7 +18,7 @@ export interface User {
   email: string;
   fullName: string;
   phone: string;
-  userType: 'owner' | 'buyer' | 'admin'; 
+  userType: 'owner' | 'buyer' | 'admin';
   address?: string;
   photo?: string;
   gender?: 'male' | 'female' | 'other';
@@ -64,14 +64,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load user saat app start
+  // Load cached user session on app start
   useEffect(() => {
     const loadUser = async () => {
       try {
         const userData = await AsyncStorage.getItem(USER_KEY);
         if (userData) setUser(JSON.parse(userData));
       } catch (error) {
-        console.error('Error loading user:', error);
+        console.error('Error loading cached user:', error);
       } finally {
         setIsLoading(false);
       }
@@ -79,111 +79,81 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     loadUser();
   }, []);
 
-  // REGISTER FUNCTION
+  // REGISTER → POST /api/auth/register
   const register = async (data: RegisterData): Promise<AuthResponse> => {
-    const { email, password, fullName, phone, userType, address, gender, dob, location, photo } = data;
-
+    const { email, password, fullName, phone, userType } = data;
     try {
-      const usersData = await AsyncStorage.getItem(USERS_KEY);
-      const users = usersData ? JSON.parse(usersData) : [];
-
-      const existingUser = users.find((u: any) => u.email === email);
-      if (existingUser) return { success: false, message: 'Email sudah terdaftar' };
-
-      const newUser: User = {
-        id: Date.now().toString(),
-        email,
+      const res = await api.post('/auth/register', {
+        email, password,
         fullName,
-        phone,
         userType,
-        address,
-        gender,
-        dob,
-        location,
-        photo,
+      });
+
+      const { token, user: apiUser } = res.data;
+      const mappedUser: User = {
+        id:        apiUser.id,
+        email:     apiUser.email,
+        fullName:  apiUser.full_name || fullName,
+        phone:     phone || '',
+        userType:  apiUser.user_type,
         createdAt: new Date().toISOString(),
       };
 
-      users.push({ ...newUser, password });
-      await AsyncStorage.setItem(USERS_KEY, JSON.stringify(users));
+      await AsyncStorage.setItem(TOKEN_KEY, token);
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(mappedUser));
+      setUser(mappedUser);
 
-      await AsyncStorage.setItem(USER_KEY, JSON.stringify(newUser));
-      setUser(newUser);
-
-      return { success: true, message: 'Registrasi berhasil', user: newUser };
-    } catch (error) {
-      console.error('Error registering:', error);
-      return { success: false, message: 'Registrasi gagal' };
+      return { success: true, message: 'Registrasi berhasil', user: mappedUser };
+    } catch (error: any) {
+      const msg = error.response?.data?.error || 'Registrasi gagal';
+      return { success: false, message: msg };
     }
   };
 
-  // LOGIN FUNCTION (dengan admin)
+  // LOGIN → POST /api/auth/login
   const login = async (email: string, password: string): Promise<AuthResponse> => {
     try {
-      // 1️⃣ Hardcode admin
-      const adminEmail = 'admin@lokatani.com';
-      const adminPassword = 'admin123';
+      const res = await api.post('/auth/login', { email, password });
+      const { token, user: apiUser } = res.data;
 
-      if (email === adminEmail && password === adminPassword) {
-        const adminUser: User = {
-          id: 'admin-1',
-          email: adminEmail,
-          fullName: 'Administrator',
-          phone: '',
-          userType: 'admin',
-          createdAt: new Date().toISOString(),
-        };
-        await AsyncStorage.setItem(USER_KEY, JSON.stringify(adminUser));
-        setUser(adminUser);
-        return { success: true, message: 'Login berhasil (admin)', user: adminUser };
-      }
+      const mappedUser: User = {
+        id:        apiUser.id,
+        email:     apiUser.email,
+        fullName:  apiUser.fullName || apiUser.full_name,
+        phone:     apiUser.phone || '',
+        userType:  apiUser.userType || apiUser.user_type,
+        photo:     apiUser.photo,
+        createdAt: new Date().toISOString(),
+      };
 
-      // 2️⃣ Cek user biasa
-      const usersData = await AsyncStorage.getItem(USERS_KEY);
-      const users = usersData ? JSON.parse(usersData) : [];
+      await AsyncStorage.setItem(TOKEN_KEY, token);
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(mappedUser));
+      setUser(mappedUser);
 
-      const foundUser = users.find((u: any) => u.email === email && u.password === password);
-      if (!foundUser) return { success: false, message: 'Email atau kata sandi salah' };
-
-      const { password: _, ...userWithoutPassword } = foundUser;
-      await AsyncStorage.setItem(USER_KEY, JSON.stringify(userWithoutPassword));
-      setUser(userWithoutPassword);
-
-      return { success: true, message: 'Login berhasil', user: userWithoutPassword };
-    } catch (error) {
-      console.error('Error logging in:', error);
-      return { success: false, message: 'Login gagal' };
+      return { success: true, message: 'Login berhasil', user: mappedUser };
+    } catch (error: any) {
+      const msg = error.response?.data?.error || 'Email atau kata sandi salah';
+      return { success: false, message: msg };
     }
   };
 
   // LOGOUT
   const logout = async () => {
     try {
-      await AsyncStorage.removeItem(USER_KEY);
+      await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
       setUser(null);
-      router.replace("/(tabsGuest)/homeGuest");
     } catch (error) {
-      console.error("Error logging out:", error);
+      console.error('Error logging out:', error);
     }
   };
 
-  // UPDATE USER
+  // UPDATE USER (local cache only – no dedicated /me PUT endpoint yet)
   const updateUser = async (userData: Partial<User>) => {
     try {
       if (!user) return;
-
       const updatedUser = { ...user, ...userData };
       await AsyncStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
       setUser(updatedUser);
-
-      const usersData = await AsyncStorage.getItem(USERS_KEY);
-      const users = usersData ? JSON.parse(usersData) : [];
-      const userIndex = users.findIndex((u: any) => u.id === user.id);
-
-      if (userIndex !== -1) {
-        users[userIndex] = { ...users[userIndex], ...userData };
-        await AsyncStorage.setItem(USERS_KEY, JSON.stringify(users));
-      }
     } catch (error) {
       console.error('Error updating user:', error);
     }

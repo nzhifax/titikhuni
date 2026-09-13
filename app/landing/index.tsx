@@ -1,12 +1,9 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useRef } from "react";
-import { Animated, StyleSheet, Text } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { useTheme } from "../../contexts/ThemeContext";
+import { Animated, Image, StyleSheet, Text, View } from "react-native";
 
 export default function LandingPage() {
-  const { theme } = useTheme();
   const router = useRouter();
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -41,20 +38,11 @@ export default function LandingPage() {
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [fadeAnim, floatAnim, router]);
 
   return (
-    <LinearGradient
-      colors={[
-        "#0F172A",          // deep navy (kontras atas)
-        theme.primary,      // brand color
-        theme.background,   // bawah
-      ]}
-      locations={[0, 0.55, 1]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 0, y: 1 }}
-      style={styles.container}
-    >
+    <View style={styles.container}>
+      <StatusBar style="dark" />
       <Animated.View
         style={[
           styles.content,
@@ -64,63 +52,49 @@ export default function LandingPage() {
           },
         ]}
       >
-        {/* Glow logo */}
-        <LinearGradient
-          colors={[
-            theme.primary + "66",
-            theme.primary + "00",
-          ]}
-          style={styles.logoGlow}
-        />
-
-        <Ionicons
-          name="home-outline"
-          size={70}
-          color="#FFFFFF"
+        <Image
+          source={require("../../assets/images/logo.png")}
           style={styles.logo}
+          resizeMode="contain"
         />
 
-        <Text style={styles.title}>Teraloka</Text>
+        <Text style={styles.title}>titikhuni</Text>
 
         <Text style={styles.subtitle}>
           Temukan & Sewakan Properti dengan Mudah
         </Text>
       </Animated.View>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#FFFFFF",
   },
   content: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 24,
   },
-
-  logoGlow: {
-    position: "absolute",
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-  },
-
   logo: {
-    marginBottom: 14,
+    width: 120,
+    height: 120,
+    marginBottom: 20,
   },
-
   title: {
     fontSize: 38,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: "#0F172A",
     letterSpacing: 0.8,
   },
   subtitle: {
     fontSize: 14,
     marginTop: 8,
-    color: "#E5E7EB",
+    color: "#64748B",
+    textAlign: "center",
     opacity: 0.9,
   },
 });

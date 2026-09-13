@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
-  Animated,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -10,24 +12,16 @@ import {
   Text,
   TouchableOpacity,
   View,
-  TextInput,
-  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
-import MapView, { Marker, MapPressEvent } from "react-native-maps";
-import * as Location from "expo-location";
-import { useTheme } from "../../contexts/ThemeContext";
 import { Input } from "../../components/common/Input";
 import { useAuth } from "../../contexts/AuthContext";
+import { useTheme } from "../../contexts/ThemeContext";
 
 export default function Register() {
-  const router = useRouter();
   const { theme } = useTheme();
   const { register } = useAuth();
-
-  const [step, setStep] = useState(1);
-  const [progress] = useState(new Animated.Value(0));
+  const router = useRouter();
 
   // 📋 Form states
   const [fullName, setFullName] = useState("");
@@ -35,80 +29,26 @@ export default function Register() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [userType, setUserType] = useState<"owner" | "buyer">("owner");
-  const [address, setAddress] = useState("");
+  const [userType, setUserType] = useState<"owner" | "buyer">("buyer");
+  const [agreeTerms, setAgreeTerms] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  // 🗺️ Map state
-  const [region, setRegion] = useState({
-    latitude: -6.2,
-    longitude: 106.816666,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
-  });
-  const [marker, setMarker] = useState<{ latitude: number; longitude: number } | null>(null);
-
-  // 🌊 Progress animation
-  const nextStep = () => {
-    setStep(2);
-    Animated.timing(progress, {
-      toValue: 1,
-      duration: 400,
-      useNativeDriver: false,
-    }).start();
-  };
-
-  const prevStep = () => {
-    setStep(1);
-    Animated.timing(progress, {
-      toValue: 0,
-      duration: 400,
-      useNativeDriver: false,
-    }).start();
-  };
-
-  // 📍 Ambil lokasi otomatis
-  const handleGetCurrentAddress = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Izin Diperlukan", "Aktifkan izin lokasi untuk menentukan posisi Anda.");
-        return;
-      }
-      const location = await Location.getCurrentPositionAsync({});
-      const geocode = await Location.reverseGeocodeAsync(location.coords);
-      if (geocode.length > 0) {
-        const addr = `${geocode[0].street || ""}, ${geocode[0].city || ""}, ${geocode[0].region || ""}`;
-        setAddress(addr.trim());
-        setMarker(location.coords);
-        setRegion({ ...region, ...location.coords });
-      }
-    } catch (e) {
-      Alert.alert("Error", "Tidak dapat mengambil lokasi.");
-      console.error(e);
-    }
-  };
-
-  // 🖱️ Saat peta ditekan
-  const handleMapPress = async (e: MapPressEvent) => {
-    const { latitude, longitude } = e.nativeEvent.coordinate;
-    setMarker({ latitude, longitude });
-    setRegion({ ...region, latitude, longitude });
-    const geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
-    if (geocode.length > 0) {
-      const addr = `${geocode[0].street || ""}, ${geocode[0].city || ""}, ${geocode[0].region || ""}`;
-      setAddress(addr.trim());
-    }
-  };
-
-  // 🧾 Daftar akun
+  // ================= HANDLE REGISTER =================
   const handleRegister = async () => {
-    if (!fullName || !email || !password || !confirmPassword) {
-      Alert.alert("Error", "Mohon isi semua data.");
+    if (!fullName || !email || !phone || !password || !confirmPassword) {
+      Alert.alert("Data belum lengkap", "Mohon lengkapi semua field yang tersedia.");
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert("Error", "Password tidak sama.");
+      Alert.alert("Password tidak cocok", "Konfirmasi password harus sama dengan kata sandi.");
+      return;
+    }
+    if (!agreeTerms) {
+      Alert.alert(
+        "Persetujuan diperlukan",
+        "Anda harus menyetujui Syarat & Ketentuan untuk mendaftar."
+      );
       return;
     }
 
@@ -120,156 +60,296 @@ export default function Register() {
         password,
         phone,
         userType,
-        address,
       });
       setLoading(false);
 
       if (result.success) {
-        Alert.alert("Sukses", "Akun berhasil dibuat!");
-        router.replace("/auth/login");
+        Alert.alert("Pendaftaran Berhasil", "Akun Anda telah berhasil dibuat!", [
+          {
+            text: "OK",
+            onPress: () => {
+              if (userType === "owner") {
+                router.replace("/(tabsOwner)/homeOwner");
+              } else {
+                router.replace("/(tabsBuyer)/homeBuyer");
+              }
+            },
+          },
+        ]);
       } else {
-        Alert.alert("Error", result.message || "Registrasi gagal.");
+        Alert.alert("Pendaftaran Gagal", result.message || "Gagal membuat akun.");
       }
     } catch (e) {
       setLoading(false);
-      Alert.alert("Error", "Terjadi kesalahan saat registrasi.");
+      Alert.alert("Kesalahan", "Terjadi kesalahan saat melakukan registrasi.");
       console.error(e);
     }
   };
 
-  const progressWidth = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["50%", "100%"],
-  });
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
-        
-        {/* Progress Bar */}
-        <View style={styles.progressContainer}>
-          <Animated.View
-            style={[styles.progressBar, { backgroundColor: theme.primary, width: progressWidth }]}
-          />
-        </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ================= HEADER ================= */}
+          <View style={styles.header}>
+            <Image
+              source={require("../../assets/images/logo.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+            {/* <Text style={[styles.logoTitle, { color: theme.primary }]}></Text> */}
 
-        <ScrollView contentContainerStyle={styles.scroll}>
-          {/* STEP 1 */}
-          {step === 1 && (
-            <View>
-              <Text style={[styles.stepTitle, { color: theme.text }]}>Langkah 1: Informasi Akun</Text>
-              <Input placeholder="Nama Lengkap" value={fullName} onChangeText={setFullName} icon="person-outline" />
-              <Input placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" icon="mail-outline" />
-              <Input placeholder="Nomor Telepon" value={phone} onChangeText={setPhone} keyboardType="phone-pad" icon="call-outline" />
-              <Input placeholder="Kata Sandi" value={password} onChangeText={setPassword} isPassword icon="lock-closed-outline" />
-              <Input placeholder="Konfirmasi Sandi" value={confirmPassword} onChangeText={setConfirmPassword} isPassword icon="lock-closed-outline" />
+            <Text style={[styles.title, { color: theme.text }]}>
+              Buat Akun Baru
+            </Text>
+            <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+              Temukan dan sewa hunian terbaik dengan mudah dan praktis
+            </Text>
+          </View>
 
-              {/* Tombol Lanjut */}
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={[styles.button, { backgroundColor: theme.primary }]}
-                  onPress={nextStep}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.buttonText}>Lanjut</Text>
-                  <Ionicons name="arrow-forward-outline" size={18} color="#fff" style={{ marginLeft: 6 }} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
+          {/* ================= FORM ================= */}
+          <View style={styles.form}>
+            <Input
+              placeholder="Nama Lengkap"
+              value={fullName}
+              onChangeText={setFullName}
+              icon="person-outline"
+            />
 
-          {/* STEP 2 */}
-          {step === 2 && (
-            <View>
-              <Text style={[styles.stepTitle, { color: theme.text }]}>Langkah 2: Role & Lokasi</Text>
+            <Input
+              placeholder="Email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              icon="mail-outline"
+            />
 
-              {/* Role Selector */}
-              <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>Pilih Jenis Pengguna</Text>
-              <View style={styles.roleContainer}>
-                {[
-                  { type: "owner", icon: "home-outline", label: "Pemilik" },
-                  { type: "buyer", icon: "cart-outline", label: "Pembeli" },
-                ].map((r) => (
-                  <TouchableOpacity
-                    key={r.type}
-                    style={[
-                      styles.roleCard,
-                      {
-                        backgroundColor: userType === r.type ? theme.primary : theme.surface,
-                        borderColor: userType === r.type ? theme.primary : theme.border,
-                      },
-                    ]}
-                    onPress={() => setUserType(r.type as "owner" | "buyer")}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name={r.icon as any} size={28} color={userType === r.type ? "#fff" : theme.text} />
-                    <Text style={[styles.roleText, { color: userType === r.type ? "#fff" : theme.text }]}>{r.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+            <Input
+              placeholder="Nomor Telepon"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              icon="call-outline"
+            />
 
-              {/* Lokasi */}
-              <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>Lokasi Anda</Text>
-              <View style={[styles.addressCard, { backgroundColor: theme.surface }]}>
-                <View style={styles.addressInputWrapper}>
-                  <Ionicons name="location-sharp" size={20} color={theme.primary} style={{ marginRight: 8 }} />
-                  <TextInput
-                    placeholder="Masukkan alamat atau ambil otomatis..."
-                    placeholderTextColor={theme.textSecondary}
-                    value={address}
-                    onChangeText={setAddress}
-                    style={[styles.addressInput, { color: theme.text }]}
+            <Input
+              placeholder="Kata Sandi"
+              value={password}
+              onChangeText={setPassword}
+              isPassword
+              icon="lock-closed-outline"
+            />
+
+            <Input
+              placeholder="Konfirmasi Kata Sandi"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              isPassword
+              icon="lock-closed-outline"
+            />
+
+            {/* Dropdown Pilihan Jenis Akun */}
+            <View style={styles.dropdownContainer}>
+              <Text style={[styles.label, { color: theme.text }]}>Jenis Akun</Text>
+              <TouchableOpacity
+                style={[
+                  styles.dropdownHeader,
+                  {
+                    backgroundColor: theme.inputBackground || theme.surfaceLight,
+                    borderColor: theme.border,
+                    borderWidth: theme.borderWidth,
+                    borderRadius: theme.borderRadius,
+                  },
+                ]}
+                onPress={() => setDropdownOpen(!dropdownOpen)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.dropdownHeaderLeft}>
+                  <Ionicons
+                    name="people-outline"
+                    size={20}
+                    color={theme.textSecondary}
+                    style={styles.dropdownIcon}
                   />
-                </View>
-
-                <TouchableOpacity
-                  style={[styles.smallButton, { backgroundColor: theme.primary }]}
-                  onPress={handleGetCurrentAddress}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="navigate-outline" size={18} color="#fff" />
-                  <Text style={styles.smallButtonText}>Gunakan Lokasi Saya</Text>
-                </TouchableOpacity>
-
-                <View style={styles.mapWrapper}>
-                  <MapView style={styles.map} region={region} onPress={handleMapPress}>
-                    {marker && <Marker coordinate={marker} />}
-                  </MapView>
-                  <Text style={[styles.mapHint, { color: theme.textSecondary }]}>
-                    Tekan peta untuk memilih lokasi manual
+                  <Text style={[styles.dropdownValueText, { color: theme.text }]}>
+                    {userType === "buyer" ? "Pencari Hunian" : "Pemilik Properti"}
                   </Text>
                 </View>
-              </View>
+                <Ionicons
+                  name={dropdownOpen ? "chevron-up" : "chevron-down"}
+                  size={20}
+                  color={theme.textSecondary}
+                />
+              </TouchableOpacity>
 
-              {/* Tombol Navigasi */}
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={[styles.button, styles.outlineButton, { borderColor: theme.primary }]}
-                  onPress={prevStep}
-                  activeOpacity={0.8}
+              {dropdownOpen && (
+                <View
+                  style={[
+                    styles.dropdownOptionsList,
+                    {
+                      backgroundColor: theme.card,
+                      borderColor: theme.border,
+                      borderWidth: theme.borderWidth,
+                      borderRadius: theme.borderRadius,
+                      shadowColor: theme.shadow || '#000',
+                      shadowOffset: theme.shadowOffset,
+                      shadowOpacity: theme.shadowOpacity,
+                      shadowRadius: theme.shadowRadius,
+                      elevation: 3,
+                    },
+                  ]}
                 >
-                  <Ionicons name="arrow-back-outline" size={18} color={theme.primary} />
-                  <Text style={[styles.buttonTextOutline, { color: theme.primary }]}>Kembali</Text>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.dropdownOption,
+                      userType === "buyer" && { backgroundColor: theme.primary + "15" },
+                    ]}
+                    onPress={() => {
+                      setUserType("buyer");
+                      setDropdownOpen(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name="home-outline"
+                      size={18}
+                      color={userType === "buyer" ? theme.primary : theme.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.dropdownOptionText,
+                        { color: theme.text },
+                        userType === "buyer" && { color: theme.primary, fontWeight: "600" },
+                      ]}
+                    >
+                      Pencari Hunian
+                    </Text>
+                  </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[styles.button, { backgroundColor: theme.primary }]}
-                  onPress={handleRegister}
-                  disabled={loading}
-                  activeOpacity={0.8}
-                >
-                  {loading ? (
-                    <ActivityIndicator color="#fff" />
-                  ) : (
-                    <>
-                      <Text style={styles.buttonText}>Daftar Sekarang</Text>
-                      <Ionicons name="arrow-forward-outline" size={18} color="#fff" style={{ marginLeft: 6 }} />
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
+                  <View style={[styles.optionDivider, { backgroundColor: theme.border }]} />
+
+                  <TouchableOpacity
+                    style={[
+                      styles.dropdownOption,
+                      userType === "owner" && { backgroundColor: theme.primary + "15" },
+                    ]}
+                    onPress={() => {
+                      setUserType("owner");
+                      setDropdownOpen(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name="business-outline"
+                      size={18}
+                      color={userType === "owner" ? theme.primary : theme.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.dropdownOptionText,
+                        { color: theme.text },
+                        userType === "owner" && { color: theme.primary, fontWeight: "600" },
+                      ]}
+                    >
+                      Pemilik Properti
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
-          )}
+
+            {/* Checkbox Syarat & Ketentuan */}
+            <TouchableOpacity
+              style={styles.checkboxRow}
+              onPress={() => setAgreeTerms(!agreeTerms)}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name={agreeTerms ? "checkbox" : "square-outline"}
+                size={22}
+                color={agreeTerms ? theme.primary : theme.textSecondary}
+              />
+              <Text style={[styles.checkboxText, { color: theme.textSecondary }]}>
+                Saya menyetujui{" "}
+                <Text style={{ color: theme.primary, fontWeight: "600" }}>
+                  Syarat & Ketentuan
+                </Text>{" "}
+                yang berlaku
+              </Text>
+            </TouchableOpacity>
+
+            {/* REGISTER BUTTON */}
+            <TouchableOpacity
+              style={[
+                styles.registerButton,
+                { backgroundColor: theme.primary, borderRadius: theme.borderRadius, opacity: loading ? 0.8 : 1 },
+              ]}
+              onPress={handleRegister}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Text style={styles.registerText}>Daftar Sekarang</Text>
+                  <Ionicons name="arrow-forward-outline" size={18} color="#fff" />
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* ================= DIVIDER ================= */}
+            <View style={styles.dividerRow}>
+              <View style={[styles.divider, { backgroundColor: theme.border }]} />
+              <Text style={[styles.dividerText, { color: theme.textSecondary }]}>
+                atau daftar dengan
+              </Text>
+              <View style={[styles.divider, { backgroundColor: theme.border }]} />
+            </View>
+
+            {/* ================= SOCIAL LOGIN ================= */}
+            <TouchableOpacity
+              style={[styles.socialBtn, { borderColor: theme.border, borderRadius: theme.borderRadius }]}
+              onPress={() => Alert.alert("Informasi", "Pendaftaran dengan Google akan segera tersedia.")}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="logo-google" size={20} color="#DB4437" />
+              <Text style={[styles.socialText, { color: theme.text }]}>
+                Daftar dengan Google
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.socialBtn, { borderColor: theme.border, borderRadius: theme.borderRadius }]}
+              onPress={() => Alert.alert("Informasi", "Pendaftaran dengan Apple akan segera tersedia.")}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="logo-apple" size={20} color={theme.text} />
+              <Text style={[styles.socialText, { color: theme.text }]}>
+                Daftar dengan Apple
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* ================= FOOTER ================= */}
+          <View style={styles.footer}>
+            <Text style={[styles.footerText, { color: theme.textSecondary }]}>
+              Sudah punya akun?
+            </Text>
+            <TouchableOpacity onPress={() => router.push("/auth/login")}>
+              <Text style={[styles.footerLink, { color: theme.primary }]}>
+                {" "}Masuk
+              </Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -278,96 +358,161 @@ export default function Register() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scroll: { padding: 24, flexGrow: 1 },
-  progressContainer: {
-    height: 6,
-    backgroundColor: "#E5E7EB",
-    borderRadius: 4,
-    marginHorizontal: 20,
-    marginTop: 10,
+  scroll: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 40,
+  },
+  header: {
+    alignItems: "center",
+    marginBottom: 28,
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    marginBottom: 12,
+  },
+  logoCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  logoTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    marginBottom: 12,
+    letterSpacing: 0.5,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "700",
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  subtitle: {
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  form: {
+    width: "100%",
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  dropdownContainer: {
     marginBottom: 16,
+    position: "relative",
   },
-  progressBar: { height: 6, borderRadius: 4 },
-  stepTitle: { fontSize: 20, fontWeight: "700", marginBottom: 20 },
-  sectionLabel: { fontSize: 14, marginBottom: 8 },
-
-  roleContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginBottom: 24,
-  },
-  roleCard: {
-    width: "42%",
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingVertical: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 2,
-  },
-  roleText: { marginTop: 6, fontSize: 16, fontWeight: "600" },
-
-  addressCard: {
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  addressInputWrapper: {
+  dropdownHeader: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "#f9fafb",
-  },
-  addressInput: { flex: 1, fontSize: 15 },
-  smallButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 10,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  smallButtonText: { color: "#fff", fontWeight: "600", fontSize: 13, marginLeft: 6 },
-  mapWrapper: { borderRadius: 12, overflow: "hidden", marginTop: 12 },
-  map: { width: "100%", height: 180 },
-  mapHint: { fontSize: 12, textAlign: "center", paddingTop: 8 },
-
-  // Tombol
-  buttonRow: {
-    flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 24,
+    borderWidth: 1.2,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 50,
+  },
+  dropdownHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  dropdownIcon: {
+    marginRight: 8,
+  },
+  dropdownValueText: {
+    fontSize: 15,
+  },
+  dropdownOptionsList: {
+    marginTop: 6,
+    borderWidth: 1.2,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  dropdownOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     gap: 10,
   },
-  button: {
+  dropdownOptionText: {
+    fontSize: 15,
+  },
+  optionDivider: {
+    height: 1,
+    width: "100%",
+  },
+  checkboxRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 14,
+    paddingRight: 16,
+    gap: 8,
+  },
+  checkboxText: {
+    fontSize: 13,
+    lineHeight: 18,
     flex: 1,
+  },
+  registerButton: {
+    marginTop: 12,
+    paddingVertical: 14,
+    borderRadius: 14,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+  },
+  registerText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 24,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    fontSize: 12,
+    marginHorizontal: 10,
+  },
+  socialBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 14,
-    borderRadius: 10,
-    elevation: 2,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+    gap: 10,
   },
-  outlineButton: {
-    backgroundColor: "transparent",
-    borderWidth: 1.5,
+  socialText: {
+    fontSize: 14,
+    fontWeight: "600",
   },
-  buttonText: {
-    color: "#fff",
+  footer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 18,
+  },
+  footerText: {
+    fontSize: 14,
+  },
+  footerLink: {
+    fontSize: 14,
     fontWeight: "700",
-    fontSize: 15,
-  },
-  buttonTextOutline: {
-    fontWeight: "700",
-    fontSize: 15,
-    marginLeft: 6,
   },
 });

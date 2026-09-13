@@ -1,7 +1,10 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -9,13 +12,11 @@ import {
   Text,
   TouchableOpacity,
   View,
-  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Input } from "../../components/common/Input";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
-import { Input } from "../../components/common/Input";
 
 export default function Login() {
   const { theme } = useTheme();
@@ -77,9 +78,11 @@ export default function Login() {
         >
           {/* ================= HEADER ================= */}
           <View style={styles.header}>
-            <View style={[styles.logoCircle, { backgroundColor: theme.primary }]}>
-              <Ionicons name="home-outline" size={28} color="#fff" />
-            </View>
+            <Image
+              source={require("../../assets/images/logo.png")}
+              style={styles.logo}
+              resizeMode="contain"
+            />
 
             <Text style={[styles.title, { color: theme.text }]}>
               Selamat Datang Kembali
@@ -140,7 +143,7 @@ export default function Login() {
             <TouchableOpacity
               style={[
                 styles.loginButton,
-                { backgroundColor: theme.primary, opacity: loading ? 0.8 : 1 },
+                { backgroundColor: theme.primary, borderRadius: theme.borderRadius, opacity: loading ? 0.8 : 1 },
               ]}
               onPress={handleLogin}
               disabled={loading}
@@ -166,14 +169,14 @@ export default function Login() {
             </View>
 
             {/* ================= SOCIAL LOGIN ================= */}
-            <TouchableOpacity style={[styles.socialBtn, { borderColor: theme.border }]}>
+            <TouchableOpacity style={[styles.socialBtn, { borderColor: theme.border, borderRadius: theme.borderRadius }]}>
               <Ionicons name="logo-google" size={20} color="#DB4437" />
               <Text style={[styles.socialText, { color: theme.text }]}>
                 Masuk dengan Google
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.socialBtn, { borderColor: theme.border }]}>
+            <TouchableOpacity style={[styles.socialBtn, { borderColor: theme.border, borderRadius: theme.borderRadius }]}>
               <Ionicons name="logo-apple" size={20} color={theme.text} />
               <Text style={[styles.socialText, { color: theme.text }]}>
                 Masuk dengan Apple
@@ -212,6 +215,12 @@ const styles = StyleSheet.create({
   header: {
     alignItems: "center",
     marginBottom: 36,
+  },
+
+  logo: {
+    width: 80,
+    height: 80,
+    marginBottom: 16,
   },
 
   logoCircle: {

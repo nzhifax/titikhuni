@@ -1,227 +1,263 @@
-import React from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
   StyleSheet,
+  TextInput,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "../../contexts/AuthContext";
+import { useTheme } from "../../contexts/ThemeContext";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useChat, Conversation } from "../../contexts/ChatContext";
 
-/* ================= MOCK ================= */
-const CHATS = [
-  {
-    id: "chat-1",
-    propertyTitle: "Rumah Minimalis Sleman",
-    status: "Dijual",
-    buyerId: "buyer-1",
-    buyerName: "Andi Pratama",
-    ownerId: "owner-1",
-    ownerName: "Pemilik Rumah",
-    lastMessage: "Bisa survei besok pagi?",
-    unreadBuyer: 0,
-    unreadOwner: 2,
-  },
-];
+const PRIMARY = "#2E7D32";
 
-export default function ChatList() {
+const getInitials = (name: string) => {
+  if (!name) return "";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return name.slice(0, 2).toUpperCase();
+};
+
+export default function OwnerChatList() {
   const { user } = useAuth();
   const router = useRouter();
+  const { theme, isDark } = useTheme();
+  const { conversations, refreshConversations } = useChat();
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    refreshConversations();
+  }, [refreshConversations]);
+
+  const ownerConversations = useMemo(() => {
+    if (!user) return [];
+    return conversations
+      .filter(
+        (c) =>
+          c.ownerId === user.id ||
+          c.ownerName === user.fullName ||
+          !c.ownerId ||
+          user.userType === "owner"
+      )
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  }, [conversations, user]);
+
+  const totalUnread = useMemo(() => {
+    return ownerConversations.reduce((sum, item) => sum + (item.unreadOwner || 0), 0);
+  }, [ownerConversations]);
+
+  const filteredChats = useMemo(() => {
+    return ownerConversations.filter((item) => {
+      const search = searchQuery.toLowerCase();
+      return (
+        item.buyerName.toLowerCase().includes(search) ||
+        item.propertyTitle.toLowerCase().includes(search) ||
+        item.lastMessage.toLowerCase().includes(search)
+      );
+    });
+  }, [ownerConversations, searchQuery]);
 
   if (!user) return null;
 
-  const isBuyer = user.userType === "buyer";
-
-  const renderItem = ({ item }: any) => {
-    const partnerName = isBuyer ? item.ownerName : item.buyerName;
-    const unread = isBuyer ? item.unreadBuyer : item.unreadOwner;
+  const renderItem = ({ item }: { item: Conversation }) => {
+    const unread = item.unreadOwner || 0;
 
     return (
       <TouchableOpacity
-        activeOpacity={0.8}
-        style={styles.card}
+        activeOpacity={0.88}
+        style={[
+          styles.chatCard,
+          {
+            backgroundColor: isDark ? "#1E293B" : "#FFFFFF",
+            borderColor: isDark ? "#334155" : "#E2E8F0",
+          },
+        ]}
         onPress={() =>
           router.push({
             pathname: "/ChatRoom",
             params: {
               chatId: item.id,
-              partnerName,
+              propertyId: item.propertyId,
               propertyTitle: item.propertyTitle,
-              status: item.status,
+              ownerName: item.ownerName,
             },
           })
         }
       >
-        {/* AVATAR */}
-        <View style={styles.avatar}>
-          <Ionicons name="home-outline" size={22} color="#fff" />
+        {/* Thumbnail Image */}
+        <View style={styles.imageContainer}>
+          <Image
+            source={{ uri: item.propertyImage || "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800" }}
+            style={styles.propertyThumb}
+          />
+          {unread > 0 && <View style={styles.cardUnreadDot} />}
         </View>
 
-        {/* CONTENT */}
-        <View style={styles.content}>
+        {/* Content Details */}
+        <View style={styles.contentContainer}>
           <View style={styles.topRow}>
-            <Text style={styles.name} numberOfLines={1}>
-              {partnerName}
+            <Text style={[styles.partnerName, { color: isDark ? "#F8FAFC" : "#0F172A" }]} numberOfLines={1}>
+              {item.buyerName || "Calon Pembeli"}
+            </Text>
+            <Text style={[styles.timeText, { color: unread > 0 ? PRIMARY : "#94A3B8" }]}>
+              {item.lastMessageTime}
+            </Text>
+          </View>
+
+          <View style={styles.propertyTagRow}>
+            <Ionicons name="business" size={11} color={PRIMARY} />
+            <Text style={styles.propertyTitle} numberOfLines={1}>
+              {item.propertyTitle}
+            </Text>
+          </View>
+
+          <View style={styles.bottomRow}>
+            <Text
+              style={[
+                styles.lastMessage,
+                {
+                  color: unread > 0 ? (isDark ? "#F8FAFC" : "#0F172A") : "#64748B",
+                  fontWeight: unread > 0 ? "700" : "400",
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {item.lastMessage}
             </Text>
 
-            <View
-              style={[
-                styles.badge,
-                item.status === "Dijual"
-                  ? styles.badgeSell
-                  : styles.badgeRent,
-              ]}
-            >
-              <Text style={styles.badgeText}>{item.status}</Text>
-            </View>
+            {unread > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unread}</Text>
+              </View>
+            )}
           </View>
-
-          <Text style={styles.property} numberOfLines={1}>
-            {item.propertyTitle}
-          </Text>
-
-          <Text style={styles.lastMsg} numberOfLines={1}>
-            {item.lastMessage}
-          </Text>
         </View>
-
-        {/* UNREAD */}
-        {unread > 0 && (
-          <View style={styles.unread}>
-            <Text style={styles.unreadText}>{unread}</Text>
-          </View>
-        )}
       </TouchableOpacity>
     );
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Pesan</Text>
+    <SafeAreaView style={[styles.safe, { backgroundColor: isDark ? "#0F172A" : "#F8FAFC" }]}>
+      {/* HEADER */}
+      <View style={styles.header}>
+        <View style={styles.headerTitleRow}>
+          <Text style={[styles.title, { color: isDark ? "#F8FAFC" : "#0F172A" }]}>Pesan Pemilik</Text>
+          {totalUnread > 0 && (
+            <View style={styles.headerBadge}>
+              <Text style={styles.headerBadgeText}>{totalUnread} Baru</Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.subtitle}>Pertanyaan & pengajuan pesan dari calon pembeli</Text>
+      </View>
 
+      {/* SEARCH BAR */}
+      <View style={styles.searchContainer}>
+        <View style={[styles.searchBar, { backgroundColor: isDark ? "#1E293B" : "#FFFFFF", borderColor: isDark ? "#334155" : "#E2E8F0" }]}>
+          <Ionicons name="search-outline" size={18} color="#64748B" style={{ marginRight: 8 }} />
+          <TextInput
+            placeholder="Cari pesan atau calon pembeli..."
+            placeholderTextColor={isDark ? "#64748B" : "#94A3B8"}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            style={[styles.searchInput, { color: isDark ? "#F8FAFC" : "#0F172A" }]}
+          />
+        </View>
+      </View>
+
+      {/* CHAT LIST */}
       <FlatList
-        data={CHATS}
-        keyExtractor={(i) => i.id}
+        data={filteredChats}
+        keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        contentContainerStyle={{ paddingBottom: 20 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100, paddingTop: 4 }}
+        showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <Text style={styles.empty}>Belum ada percakapan</Text>
+          <View style={styles.emptyBox}>
+            <Ionicons name="chatbubbles-outline" size={56} color="#CBD5E1" />
+            <Text style={[styles.emptyTitle, { color: isDark ? "#F8FAFC" : "#0F172A" }]}>Belum ada pesan</Text>
+            <Text style={styles.emptyText}>
+              Pesan dari calon pembeli yang menanyakan properti Anda akan muncul di sini.
+            </Text>
+          </View>
         }
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
-/* ================= STYLE ================= */
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F9FAFB",
-    paddingHorizontal: 16,
-    paddingTop: 12,
-  },
+  safe: { flex: 1 },
+  header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
+  headerTitleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  title: { fontSize: 24, fontWeight: "800" },
+  subtitle: { fontSize: 13, color: "#64748B", marginTop: 2 },
+  headerBadge: { backgroundColor: PRIMARY, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  headerBadgeText: { color: "#FFF", fontSize: 11, fontWeight: "800" },
 
-  header: {
-    fontSize: 22,
-    fontWeight: "700",
-    marginBottom: 12,
-    color: "#111827",
-  },
-
-  card: {
+  searchContainer: { paddingHorizontal: 20, marginBottom: 16 },
+  searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
     borderRadius: 14,
-    padding: 14,
+    paddingHorizontal: 12,
+    height: 44,
+    borderWidth: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  searchInput: { flex: 1, fontSize: 14 },
+
+  chatCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
     marginBottom: 12,
     shadowColor: "#000",
-    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 2,
   },
-
-  avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: "#2563EB",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
+  imageContainer: { position: "relative", marginRight: 14 },
+  propertyThumb: { width: 56, height: 56, borderRadius: 12 },
+  cardUnreadDot: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: PRIMARY,
+    borderWidth: 2,
+    borderColor: "#FFF",
   },
 
-  content: {
-    flex: 1,
-  },
+  contentContainer: { flex: 1 },
+  topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  partnerName: { fontSize: 15, fontWeight: "800", flex: 1, marginRight: 6 },
+  timeText: { fontSize: 11, fontWeight: "700" },
+  propertyTagRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2, marginBottom: 4 },
+  propertyTitle: { fontSize: 12, fontWeight: "700", color: PRIMARY },
+  bottomRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  lastMessage: { fontSize: 13, flex: 1, marginRight: 8 },
+  badge: { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: PRIMARY, justifyContent: "center", alignItems: "center", paddingHorizontal: 6 },
+  badgeText: { color: "#FFF", fontSize: 10, fontWeight: "900" },
 
-  topRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 2,
-  },
-
-  name: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#111827",
-    flex: 1,
-    marginRight: 8,
-  },
-
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-
-  badgeSell: {
-    backgroundColor: "#DCFCE7",
-  },
-
-  badgeRent: {
-    backgroundColor: "#E0E7FF",
-  },
-
-  badgeText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#065F46",
-  },
-
-  property: {
-    fontSize: 12,
-    color: "#6B7280",
-    marginBottom: 4,
-  },
-
-  lastMsg: {
-    fontSize: 13,
-    color: "#374151",
-  },
-
-  unread: {
-    backgroundColor: "#2563EB",
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 8,
-  },
-
-  unreadText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-
-  empty: {
-    textAlign: "center",
-    marginTop: 40,
-    color: "#9CA3AF",
-  },
+  emptyBox: { alignItems: "center", justifyContent: "center", marginTop: 80, paddingHorizontal: 40 },
+  emptyTitle: { fontSize: 16, fontWeight: "800", marginTop: 16 },
+  emptyText: { textAlign: "center", fontSize: 13, color: "#64748B", marginTop: 6, lineHeight: 20 },
 });

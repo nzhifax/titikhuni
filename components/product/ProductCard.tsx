@@ -24,7 +24,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
   return (
     <TouchableOpacity
-      style={[styles.card, { backgroundColor: theme.surface }]}
+      style={[
+        styles.card,
+        {
+          backgroundColor: theme.card,
+          borderColor: theme.border,
+          borderWidth: theme.borderWidth,
+          borderRadius: theme.borderRadius,
+          shadowColor: theme.shadow || '#000',
+          shadowOffset: theme.shadowOffset,
+          shadowOpacity: theme.shadowOpacity,
+          shadowRadius: theme.shadowRadius,
+          elevation: 2,
+        },
+      ]}
       onPress={handlePress}
       activeOpacity={0.7}
     >
@@ -56,13 +69,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           </Text>
 
           {product.stock > 0 ? (
-            <View style={[styles.stockBadge, { backgroundColor: theme.success + '20' }]}>
+            <View style={[styles.stockBadge, { backgroundColor: theme.success + '15', borderRadius: 20 }]}>
               <Text style={[styles.stockText, { color: theme.success }]}>
                 {product.stock}
               </Text>
             </View>
           ) : (
-            <View style={[styles.stockBadge, { backgroundColor: theme.error + '20' }]}>
+            <View style={[styles.stockBadge, { backgroundColor: theme.error + '15', borderRadius: 20 }]}>
               <Text style={[styles.stockText, { color: theme.error }]}>0</Text>
             </View>
           )}
@@ -74,14 +87,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 16,
     overflow: 'hidden',
     marginBottom: 16,
-    elevation: 2, 
-    shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   image: {
     width: '100%',
@@ -116,7 +123,6 @@ const styles = StyleSheet.create({
   stockBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 8,
   },
   stockText: {
     fontSize: 12,
